@@ -17,6 +17,8 @@ void KrDriver::SetBufferCache(KrBufferCache* const InBufferCache)
 
 void KrDriver::Request(const KrIORequest& IORequest)
 {
+    // If there are IO operations for the requested sector
+    // no need to read the sector from the disk
     for (const KrIORequest& OtherIORequest : GetIORequests())
     {
         if (OtherIORequest.Sector == IORequest.Sector)
@@ -40,7 +42,7 @@ void KrDriver::Request(const KrIORequest& IORequest)
     std::cout << "DRIVER: Requested IO (" << (bRead ? "read" : "write") << ")";
     std::cout << " for buffer (" << Track << ":" << IORequest.Sector << ")\n";
 
-    MoveNextTrack();
+    ExecuteNextIORequest();
 }
 
 unsigned KrDriver::GetTrackBySector(const unsigned Sector) const
@@ -48,11 +50,11 @@ unsigned KrDriver::GetTrackBySector(const unsigned Sector) const
     return Sector / SectorPerTrackNum;
 }
 
-void KrDriver::HandleInterruption()
+void KrDriver::OnInterruption()
 {
     bMoveRequested = false;
 
-    const KrIORequest IORequest = *GetCurrentIORequest();
+    const KrIORequest IORequest = *GetCurrentIORequest(); // getting by value cause a reference can become invalid
 
     const unsigned Track = GetTrackBySector(IORequest.Sector);
     CurrentTrack = Track;
@@ -61,6 +63,7 @@ void KrDriver::HandleInterruption()
     std::cout << "DRIVER: Completed IO (" << (bWasRead ? "read" : "write") << ")";
     std::cout << " for buffer (" << Track << ":" << IORequest.Sector << ")\n";
 
+    // Notifying the buffer cache about the IO operation completion
     if (bWasRead)
     {
         BufferCache->OnReadBuffer(IORequest.Sector);
@@ -70,15 +73,13 @@ void KrDriver::HandleInterruption()
         BufferCache->OnWriteBuffer(IORequest.Sector);
     }
 
-    KrUserProcess* UserProcess = Scheduler->GetUserProcessByName(IORequest.UserProcessName);
-
-    SetCurrentIORequest(nullptr);
-
-    if (UserProcess)
+    // Waking up the user process if it is still running
+    if (KrUserProcess* UserProcess = Scheduler->GetUserProcessByName(IORequest.UserProcessName))
     {
         Scheduler->WakeUp(*UserProcess);
     }
 
+    // Waking up other user processes that have requested IO operation for the same sector
     std::vector<KrIORequest> IORequests = GetIORequests();
     for (size_t Index = 0; Index < IORequests.size(); ++Index)
     {
@@ -94,7 +95,7 @@ void KrDriver::HandleInterruption()
         }
     }
 
-    MoveNextTrack();
+    ExecuteNextIORequest();
 }
 
 void KrDriver::PrintSettings() const
@@ -130,21 +131,18 @@ unsigned KrDriver::GetCurrentTrack() const
     return CurrentTrack;
 }
 
-void KrDriver::MoveNextTrack()
+void KrDriver::ExecuteNextIORequest()
 {
     if (bMoveRequested)
     {
         return;
     }
 
-    const KrIORequest* IORequest = nullptr;
-    do
-    {
-        NextIORequest();
-        IORequest = GetCurrentIORequest();
-    }
-    while (IORequest && (IORequest->OperationType == KrIOOperationType::Read) && BufferCache->Contains(IORequest->Sector));
+    // Get next IO request
+    NextIORequest();
+    const KrIORequest* const IORequest = GetCurrentIORequest();
 
+    // If there are no IO requests
     if (!IORequest)
     {
         std::cout << "DRIVER: Nothing to do\n";
@@ -153,15 +151,19 @@ void KrDriver::MoveNextTrack()
 
     bMoveRequested = true;
 
+    // Requested track
     const unsigned Track = GetTrackBySector(IORequest->Sector);
 
+    // Direct move
     const unsigned CurrentDeltaTrack = std::abs((int)Track - (int)CurrentTrack);
     const unsigned HeadMoveDirectTime = CurrentDeltaTrack * HeadMoveSingleTrackTime;
 
+    // Move with rewind
     const unsigned EdgeTrack = (CurrentTrack > TrackNum / 2) ? TrackNum : 0;
     const unsigned EdgeDeltaTrack = std::abs((int)Track - (int)EdgeTrack);
     const unsigned HeadMoveWithRewindTime = (CurrentDeltaTrack ? HeadRewindTime : 0) + EdgeDeltaTrack * HeadMoveSingleTrackTime;
 
+    // Smallest move time
     const unsigned SmallestHeadMoveTime = std::min(HeadMoveDirectTime, HeadMoveWithRewindTime);
 
     std::cout << "DRIVER: Moving from track " << CurrentTrack << " to " << Track << " in " << SmallestHeadMoveTime << "us\n";
@@ -171,5 +173,6 @@ void KrDriver::MoveNextTrack()
     const unsigned IOOperationTime = SmallestHeadMoveTime + RotationDelayTime + SectorAccessTime;
     std::cout << "DRIVER: Sector access in " << IOOperationTime << "us\n";
 
+    // "Plan" an interruption
     Scheduler->RegisterDriverInterruption(IOOperationTime);
 }

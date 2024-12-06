@@ -19,26 +19,33 @@ bool KrScheduler::Tick()
 {
     std::cout << "SCHEDULER: " << SystemTime << "us (NEXT ITERATION)\n";
 
+    // Update current user process
+    // and if there are no non-blocked ones
     if (!UpdateCurrentUserProcess())
     {
+        // If there are no interruptions "planned"
         if (NextDriverInterruptionSystemTime == 0)
         {
             std::cout << "SCHEDULER: All user processes finished, flushing buffer cache\n";
 
+            // Try flushing the buffer cache
             if (BufferCache->Flush())
             {
                 std::cout << "\n";
                 return true;
             }
 
+            // If the buffer cache is already flushed
             std::cout << "SCHEDULER: Buffer cache flushed, exiting\n\n";
             return false;
         }
 
-        if (SystemTime >= NextDriverInterruptionSystemTime)
+        // If the interruption must happen now
+        if (SystemTime == NextDriverInterruptionSystemTime)
         {
             SpendTimeInDriverInterruption();
         }
+        // Otherwise wait until the next interruption
         else
         {
             const unsigned TimeUntilDriverInterruption = NextDriverInterruptionSystemTime - SystemTime;
@@ -75,15 +82,18 @@ bool KrScheduler::Tick()
         const unsigned TimeSpent = IORequest.OperationType == KrIOOperationType::Read ? SysCallReadTime : SysCallWriteTime;
         SpendTime(TimeSpent, "kernel");
 
+        // Request buffer from the cache
         IORequest.UserProcessName = CurrentUserProcess.Name;
-        const bool bIONotBlocked = BufferCache->RequestBuffer(IORequest);
-        if (bIONotBlocked)
+        const bool bCacheHit = BufferCache->RequestBuffer(IORequest);
+        if (bCacheHit)
         {
+            // Do not block user process and execute buffer modification if necessary
             IORequest.State = KrIORequestState::IONotBlocked;
             WakeUp(CurrentUserProcess);
         }
         else
         {
+            // Block user process
             IORequest.State = KrIORequestState::IOBlocked;
             std::cout << "SCHEDULER: Block user process \"" << CurrentUserProcess.Name << "\"\n";
         }
@@ -97,8 +107,10 @@ bool KrScheduler::Tick()
             SpendTime(ProcessingAfterReadTime, "user");
         }
 
+        // Remove current IO request from the user process
         CurrentUserProcess.IORequests.erase(CurrentUserProcess.IORequests.begin());
 
+        // Finish user process if it has no more IO requests
         if (CurrentUserProcess.IORequests.empty())
         {
             std::cout << "SCHEDULER: User process \"" << CurrentUserProcess.Name << "\" exited\n";
@@ -161,6 +173,7 @@ void KrScheduler::WakeUp(KrUserProcess& UserProcess)
 
 void KrScheduler::RegisterDriverInterruption(const unsigned TimeUntilDriverInterruption)
 {
+    // "Plan" next interruption
     NextDriverInterruptionSystemTime = SystemTime + UserProcessTimeAfterDriverInterruption + TimeUntilDriverInterruption;
     std::cout << "SCHEDULER: Next driver interruption at " << NextDriverInterruptionSystemTime << "us\n";
 }
@@ -181,6 +194,8 @@ bool KrScheduler::UpdateCurrentUserProcess()
         return false;
     }
 
+    // Find active (that is not blocked by IO operation) user process
+    // beginning from the current one and searching in a circle
     size_t Index = CurrentUserProcessIndex;
     do
     {
@@ -204,16 +219,19 @@ bool KrScheduler::UpdateCurrentUserProcess()
 
 void KrScheduler::SpendTime(unsigned Time, const std::string& Mode)
 {
+    // While user process time is not spent
     while (Time > 0)
     {
         UserProcessTimeAfterDriverInterruption = 0;
 
+        // If no interruptions are "planned"
         if (NextDriverInterruptionSystemTime == 0)
         {
             SpendTimeInUserProcess(Time, Mode);
             return;
         }
 
+        // If no interruption can happen during user process
         const unsigned TimeUntilDriverInterruption = NextDriverInterruptionSystemTime - SystemTime;
         if (TimeUntilDriverInterruption >= Time)
         {
@@ -221,6 +239,7 @@ void KrScheduler::SpendTime(unsigned Time, const std::string& Mode)
             return;
         }
 
+        // Spend time before the interruption on the user process
         SpendTimeInUserProcess(TimeUntilDriverInterruption, Mode);
         Time -= TimeUntilDriverInterruption;
 
@@ -240,13 +259,15 @@ void KrScheduler::SpendTimeInUserProcess(const unsigned Time, const std::string&
 
 void KrScheduler::SpendTimeInDriverInterruption()
 {
+    // Clear the interruption timer
     NextDriverInterruptionSystemTime = 0;
 
     std::cout << "\n<<< Begin driver interruption at " << SystemTime << "us\n";
 
     SystemTime += DriverInterruptionTime;
 
-    Driver->HandleInterruption();
+    // Call the interruption on the driver
+    Driver->OnInterruption();
 
     std::cout << "... Driver interruption spent " << DriverInterruptionTime << "us\n";
 

@@ -27,16 +27,19 @@ bool KrBufferCache::RequestBuffer(const KrIORequest& IORequest)
 
     if (bCacheHit)
     {
+        // If hit buffer is in the left segment
         if (bCacheHitLeft)
         {
             if (SegmentRight.size() < SegmentRightBufferNum)
             {
+                // Move to the right segment
                 const KrBuffer& MovedBuffer = *BufferInSegmentLeft;
                 SegmentRight.insert(SegmentRight.begin(), MovedBuffer);
                 SegmentLeft.erase(BufferInSegmentLeft);
             }
             else
             {
+                // Move to the beginning of the left segment
                 const KrBuffer MovedBuffer = *BufferInSegmentLeft;
                 SegmentLeft.erase(BufferInSegmentLeft);
                 SegmentLeft.insert(SegmentLeft.begin(), MovedBuffer);
@@ -52,6 +55,7 @@ bool KrBufferCache::RequestBuffer(const KrIORequest& IORequest)
         KrIORequest IOReadRequest = IORequest;
         IOReadRequest.bReadFirstly = IOReadRequest.OperationType == KrIOOperationType::Write;
 
+        // If there is some space in the left segment
         if (SegmentLeft.size() < BufferNum - SegmentRightBufferNum)
         {
             std::cout << "CACHE: Getting free buffer\n";
@@ -61,6 +65,7 @@ bool KrBufferCache::RequestBuffer(const KrIORequest& IORequest)
             const KrBuffer& RemovedBuffer = SegmentLeft.back();
             std::cout << "CACHE: Removing buffer (" << Driver->GetTrackBySector(RemovedBuffer.Sector) << ":" << RemovedBuffer.Sector << ") from cache\n";
 
+            // Request write operation for removed buffer if its content is dirty
             if (RemovedBuffer.bDirty)
             {
                 KrIORequest IOWriteRequest;
@@ -70,11 +75,13 @@ bool KrBufferCache::RequestBuffer(const KrIORequest& IORequest)
                 Driver->Request(IOWriteRequest);
             }
 
+            // Remove the rightmost buffer from the left segment
             SegmentLeft.erase(SegmentLeft.end() - 1);
         }
 
         PrintBuffer();
 
+        // Request read operation with a possible buffer modification after completion
         std::cout << "CACHE: Requesting driver read\n";
         Driver->Request(IOReadRequest);
     }
@@ -102,6 +109,7 @@ bool KrBufferCache::Flush()
     {
         for (const KrBuffer& Buffer : Segment)
         {
+            // Request write operation for the removed buffer if its content is dirty
             if (Buffer.bDirty)
             {
                 KrIORequest IOWriteRequest;
@@ -127,9 +135,11 @@ void KrBufferCache::OnReadBuffer(const unsigned Sector)
     KrBuffer Buffer;
     Buffer.Sector = Sector;
 
+    // If the buffer is not in any segment yet
     if (std::find(SegmentLeft.begin(), SegmentLeft.end(), Buffer) == SegmentLeft.end()
         && std::find(SegmentRight.begin(), SegmentRight.end(), Buffer) == SegmentRight.end())
     {
+        // Insert into the beginning of the left one
         SegmentLeft.insert(SegmentLeft.begin(), Buffer);
         std::cout << "CACHE: Buffer (" << Driver->GetTrackBySector(Buffer.Sector) << ":" << Buffer.Sector << ") added to cache\n";
     }
@@ -140,14 +150,6 @@ void KrBufferCache::OnReadBuffer(const unsigned Sector)
 void KrBufferCache::OnWriteBuffer(const unsigned Sector)
 {
     MarkDirty(Sector, false);
-}
-
-bool KrBufferCache::Contains(const unsigned Sector) const
-{
-    KrBuffer Buffer;
-    Buffer.Sector = Sector;
-    return std::find(SegmentLeft.begin(), SegmentLeft.end(), Buffer) != SegmentLeft.end()
-        || std::find(SegmentRight.begin(), SegmentRight.end(), Buffer) != SegmentRight.end();
 }
 
 void KrBufferCache::PrintBuffer() const
@@ -177,13 +179,11 @@ void KrBufferCache::MarkDirty(const unsigned Sector, const bool bDirty)
 {
     auto MarkDirtyInSegment = [Sector, bDirty](std::vector<KrBuffer>& Segment) -> bool
     {
-        for (const KrBuffer& Buffer : Segment)
+        for (KrBuffer& Buffer : Segment)
         {
             if (Buffer.Sector == Sector)
             {
-                KrBuffer NewBuffer = Buffer;
-                NewBuffer.bDirty = bDirty;
-                std::find(Segment.begin(), Segment.end(), Buffer)->bDirty = bDirty;
+                Buffer.bDirty = bDirty;
                 return true;
             }
         }

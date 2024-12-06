@@ -13,14 +13,16 @@ class KrBufferCache final
 public:
     void SetDriver(KrDriver* const InDriver);
 
+    /* Request buffer access, returns whether a cache hit happened */
     bool RequestBuffer(const KrIORequest& IORequest);
     void ModifyBuffer(const unsigned Sector);
 
     bool Flush();
 
+    /* On buffer read from the disk */
     void OnReadBuffer(const unsigned Sector);
+    /* On buffer written to the disk */
     void OnWriteBuffer(const unsigned Sector);
-    bool Contains(const unsigned Sector) const;
 
     void PrintBuffer() const;
 

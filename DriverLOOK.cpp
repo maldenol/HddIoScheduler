@@ -12,7 +12,9 @@ void KrDriverLOOK::PrintSettings() const
 
 void KrDriverLOOK::AddIORequest(const KrIORequest& IORequest)
 {
+    // And request to the queue
     IORequestQueue.push_back(IORequest);
+    // And sort the queue
     std::sort(IORequestQueue.begin(), IORequestQueue.end());
 }
 
@@ -37,6 +39,7 @@ void KrDriverLOOK::NextIORequest()
     KrIORequest Result;
     bool bResultIsSet = false;
 
+    // Determine start and end indexes for the loop based on the move direction
     size_t Index, End;
     if (bMovingOut)
     {
@@ -53,8 +56,10 @@ void KrDriverLOOK::NextIORequest()
         const KrIORequest& IORequest = IORequestQueue[Index];
         const unsigned Track = GetTrackBySector(IORequest.Sector);
 
+        // If requested track is the current one
         if (Track == GetCurrentTrack())
         {
+            // If able to access the same track one more time
             if (CurrentConsecutiveAccessToTrackNum < MaxConsecutiveAccessToTrackNum)
             {
                 ++CurrentConsecutiveAccessToTrackNum;
@@ -66,8 +71,10 @@ void KrDriverLOOK::NextIORequest()
                 break;
             }
         }
+        // If requested track lays in the move direction
         else if ((Track > GetCurrentTrack()) == bMovingOut)
         {
+            // Clear the consecutive access to track counter
             CurrentConsecutiveAccessToTrackNum = 0;
 
             Result = IORequest;
@@ -87,8 +94,10 @@ void KrDriverLOOK::NextIORequest()
         }
     }
 
+    // If unable move in the current direction
     if (!bResultIsSet)
     {
+        // Flip the move direction, clear the consecutive access to track counter and try one more time
         bMovingOut = !bMovingOut;
         CurrentConsecutiveAccessToTrackNum = 0;
         NextIORequest();

@@ -16,11 +16,13 @@ public:
     void SetScheduler(KrScheduler* InScheduler);
     void SetBufferCache(KrBufferCache* const InBufferCache);
 
+    /* Request disk IO operation */
     void Request(const KrIORequest& IORequest);
 
     unsigned GetTrackBySector(const unsigned Sector) const;
 
-    void HandleInterruption();
+    /* On disk driver interruption */
+    void OnInterruption();
 
     virtual void PrintSettings() const;
 
@@ -44,7 +46,8 @@ private:
     unsigned RotationDelayTime = 4000;
     unsigned SectorAccessTime = 16;
 
-    void MoveNextTrack();
+    /* Executes next IO request if not executing yet */
+    void ExecuteNextIORequest();
 
     unsigned CurrentTrack = 0;
 

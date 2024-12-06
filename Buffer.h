@@ -4,6 +4,7 @@
 struct KrBuffer final
 {
     unsigned Sector;
+    /* Whether content was modified and not written to the disk */
     bool bDirty = false;
 
     bool operator==(const KrBuffer& Other) const

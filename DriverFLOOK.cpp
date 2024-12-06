@@ -5,8 +5,10 @@
 
 void KrDriverFLOOK::AddIORequest(const KrIORequest& IORequest)
 {
+    // Get the inactive queue and add the request to it
     std::vector<KrIORequest>& IORequestQueue = bUsingQueueLeft ? IORequestQueueRight : IORequestQueueLeft;
     IORequestQueue.push_back(IORequest);
+    // Then sort the queue
     std::sort(IORequestQueue.begin(), IORequestQueue.end());
 }
 
@@ -41,15 +43,19 @@ void KrDriverFLOOK::NextIORequest()
         return;
     }
 
+    // If the active is empty
     if (bUsingQueueLeft && IORequestQueueLeft.empty() || !bUsingQueueLeft && IORequestQueueRight.empty())
     {
+        // Swap queues
         bUsingQueueLeft = !bUsingQueueLeft;
     }
+    // And get the active one
     std::vector<KrIORequest>& IORequestQueue = bUsingQueueLeft ? IORequestQueueLeft : IORequestQueueRight;
 
     KrIORequest Result;
     bool bResultIsSet = false;
 
+    // Determine start and end indexes for the loop based on the move direction
     size_t Index, End;
     if (bMovingOut)
     {
@@ -66,6 +72,7 @@ void KrDriverFLOOK::NextIORequest()
         const KrIORequest& IORequest = IORequestQueue[Index];
         const unsigned Track = GetTrackBySector(IORequest.Sector);
 
+        // If requested track is the current one
         if (Track == GetCurrentTrack())
         {
             Result = IORequest;
@@ -74,6 +81,7 @@ void KrDriverFLOOK::NextIORequest()
 
             break;
         }
+        // If requested track lays in the move direction
         else if ((Track > GetCurrentTrack()) == bMovingOut)
         {
             Result = IORequest;
@@ -93,8 +101,10 @@ void KrDriverFLOOK::NextIORequest()
         }
     }
 
+    // If unable move in the current direction
     if (!bResultIsSet)
     {
+        // Flip the move direction and try one more time
         bMovingOut = !bMovingOut;
         NextIORequest();
     }

@@ -4,6 +4,7 @@
 
 void KrDriverFIFO::AddIORequest(const KrIORequest& IORequest)
 {
+    // Add new IO request to the end of the queue
     IORequestQueue.push_back(IORequest);
 }
 
@@ -25,6 +26,7 @@ void KrDriverFIFO::NextIORequest()
         return;
     }
 
+    // Get next IO request from the beginning of the queue
     const KrIORequest Result = IORequestQueue.front();
     IORequestQueue.erase(IORequestQueue.begin());
 

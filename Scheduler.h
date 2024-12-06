@@ -14,12 +14,15 @@ public:
     void SetBufferCache(KrBufferCache* const InBufferCache);
     void SetDriver(KrDriver* const InDriver);
 
+    /* Completes one iteration of the scheduler, returns whether the next iteration should be called */
     bool Tick();
 
     void Enqueue(const KrUserProcess& UserProcess);
     KrUserProcess* GetUserProcessByName(const std::string& UserProcessName);
 
+    /* Wakes up user process with a possible buffer modification */
     void WakeUp(KrUserProcess& UserProcess);
+    /* "Plans" next driver interruption */
     void RegisterDriverInterruption(const unsigned TimeUntilDriverInterruption);
 
     void PrintSettings() const;
@@ -27,6 +30,7 @@ public:
 private:
     bool UpdateCurrentUserProcess();
 
+    /* Spend time in user process with possible interruptions */
     void SpendTime(unsigned Time, const std::string& Mode);
     void SpendTimeInUserProcess(const unsigned Time, const std::string& Mode);
     void SpendTimeInDriverInterruption();

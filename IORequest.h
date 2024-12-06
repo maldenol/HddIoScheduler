@@ -24,6 +24,7 @@ struct KrIORequest final
     unsigned Sector;
     KrIOOperationType OperationType;
 
+    /* Whether the sector should be read before writing */
     bool bReadFirstly = false;
     KrIORequestState State = KrIORequestState::BeforeIO;
     std::string UserProcessName;
