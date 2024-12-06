@@ -13,7 +13,7 @@ void KrDriverFIFO::RemoveIORequest(const KrIORequest& IORequest)
     IORequestQueue.erase(std::remove(IORequestQueue.begin(), IORequestQueue.end(), IORequest), IORequestQueue.end());
 }
 
-std::vector<KrIORequest> KrDriverFIFO::GetIORequests() const
+std::vector<KrIORequest> KrDriverFIFO::GetIORequestQueue() const
 {
     return IORequestQueue;
 }

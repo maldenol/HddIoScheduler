@@ -29,7 +29,7 @@ public:
 protected:
     virtual void AddIORequest(const KrIORequest& IORequest) = 0;
     virtual void RemoveIORequest(const KrIORequest& IORequest) = 0;
-    virtual std::vector<KrIORequest> GetIORequests() const = 0;
+    virtual std::vector<KrIORequest> GetIORequestQueue() const = 0;
 
     virtual void NextIORequest() = 0;
 

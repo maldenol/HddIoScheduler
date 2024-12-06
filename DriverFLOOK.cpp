@@ -26,7 +26,7 @@ void KrDriverFLOOK::RemoveIORequest(const KrIORequest& IORequest)
     }
 }
 
-std::vector<KrIORequest> KrDriverFLOOK::GetIORequests() const
+std::vector<KrIORequest> KrDriverFLOOK::GetIORequestQueue() const
 {
     std::vector<KrIORequest> Result;
     Result.reserve(IORequestQueueLeft.size() + IORequestQueueRight.size());

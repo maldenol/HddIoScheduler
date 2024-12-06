@@ -11,7 +11,7 @@ public:
 private:
     virtual void AddIORequest(const KrIORequest& IORequest) override;
     virtual void RemoveIORequest(const KrIORequest& IORequest) override;
-    virtual std::vector<KrIORequest> GetIORequests() const override;
+    virtual std::vector<KrIORequest> GetIORequestQueue() const override;
 
     virtual void NextIORequest() override;
 

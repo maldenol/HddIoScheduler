@@ -19,7 +19,12 @@ void KrDriver::Request(const KrIORequest& IORequest)
 {
     // If there are IO operations for the requested sector
     // no need to read the sector from the disk
-    for (const KrIORequest& OtherIORequest : GetIORequests())
+    std::vector<KrIORequest> IORequests = GetIORequestQueue();
+    if (const KrIORequest* const InnerCurrentIORequest = GetCurrentIORequest())
+    {
+        IORequests.push_back(*InnerCurrentIORequest);
+    }
+    for (const KrIORequest& OtherIORequest : IORequests)
     {
         if (OtherIORequest.Sector == IORequest.Sector)
         {
@@ -80,11 +85,8 @@ void KrDriver::OnInterruption()
     }
 
     // Waking up other user processes that have requested IO operation for the same sector
-    std::vector<KrIORequest> IORequests = GetIORequests();
-    for (size_t Index = 0; Index < IORequests.size(); ++Index)
+    for (const KrIORequest& OtherIORequest : GetIORequestQueue())
     {
-        KrIORequest& OtherIORequest = IORequests[Index];
-
         if (OtherIORequest.Sector == IORequest.Sector)
         {
             if (KrUserProcess* OtherUserProcess = Scheduler->GetUserProcessByName(OtherIORequest.UserProcessName))
